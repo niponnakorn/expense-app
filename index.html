@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#16845b">
+<link rel="manifest" href="./manifest.webmanifest">
+<title>บันทึกรายจ่าย</title>
+<style>
+:root{--green:#16845b;--green2:#eaf5ef;--ink:#20332a;--muted:#718078;--line:#dce8e0;--red:#b93832}
+*{box-sizing:border-box}
+body{margin:0;background:#f2f7f3;color:var(--ink);font-family:Arial,sans-serif}
+button,input,select,textarea{font:inherit}
+button{cursor:pointer}
+.wrap{max-width:900px;margin:auto;padding:18px}
+.panel{background:#fff;border:1px solid var(--line);border-radius:16px;padding:20px;box-shadow:0 4px 18px #173d2510}
+.login{max-width:420px;margin:8vh auto}
+.logo{text-align:center;font-size:44px}
+h1,h2,h3{margin:8px 0 16px}
+h1,h2{color:var(--green)}
+.sub{color:var(--muted);text-align:center;margin-bottom:20px}
+label{display:block;font-weight:600;margin:13px 0 6px}
+input,select,textarea{width:100%;padding:12px;border:1px solid #cddbd2;border-radius:9px;background:white;min-height:44px}
+textarea{min-height:72px;resize:vertical}
+.btn{border:0;border-radius:10px;padding:12px 16px;background:var(--green);color:#fff;font-weight:700}
+.btn.secondary{background:var(--green2);color:var(--green);border:1px solid #cce3d5}
+.btn.danger{background:#fff0ef;color:var(--red);border:1px solid #f1cbc8}
+.btn:disabled{opacity:.55;cursor:wait}
+.full{width:100%;margin-top:18px}
+.hidden{display:none!important}
+.msg{margin-top:12px;color:var(--red);font-size:14px;min-height:18px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.menu{min-height:110px;background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px;color:var(--green);font-weight:700;font-size:17px}
+.menu span{display:block;font-size:30px;margin-bottom:8px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.top h2{margin:0}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.row>*{flex:1}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}
+.tabs button{flex:1;min-width:120px}
+.card{background:white;border:1px solid var(--line);border-radius:12px;padding:14px;margin:10px 0}
+.item{display:flex;justify-content:space-between;gap:12px;align-items:center;border-bottom:1px solid #edf2ee;padding:12px 0}
+.item:last-child{border:0}
+.amount{font-weight:700;white-space:nowrap}
+.small{font-size:13px;color:var(--muted)}
+.status{font-size:13px;color:var(--muted)}
+.status.online{color:var(--green)}
+.status.offline{color:var(--red)}
+.actions{display:flex;gap:7px;flex-wrap:wrap}
+.actions button{padding:7px 10px;font-size:13px}
+.stat{font-size:25px;font-weight:700;color:var(--green)}
+.receipt-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:14px auto;max-width:560px}.receipt-action{min-height:104px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center;padding:14px 10px;font-weight:700}.receipt-action .action-icon{font-size:30px;line-height:1}.note-toggle{display:inline-flex;align-items:center;gap:7px;margin:10px 0 4px;padding:8px 0;border:0;background:transparent;color:var(--green);font-weight:700}.receipt-preview{max-width:100%;max-height:420px;display:block;margin:12px auto;border:1px solid var(--line);border-radius:10px;object-fit:contain;cursor:zoom-in}.receipt-preview.zoomed{max-height:none;cursor:zoom-out}
+.ocr-row{display:grid;grid-template-columns:minmax(0,1fr) 130px 42px;gap:8px;align-items:center;padding:9px 0;border-bottom:1px solid #edf2ee}
+.ocr-row input{min-width:0}
+.ocr-row .warn{grid-column:1/-1;color:#a66a00;font-size:12px}
+@media(max-width:520px){.ocr-row{grid-template-columns:minmax(0,1fr) 105px 38px;gap:6px}.receipt-actions{gap:8px}.receipt-action{min-height:96px;padding:10px 6px;font-size:14px}}
+@media(max-width:520px){.wrap{padding:10px}.panel{padding:16px}.grid{gap:9px}.menu{padding:14px;font-size:15px}.item{align-items:flex-start}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <section id="auth" class="panel login">
+    <div class="logo">👛</div><h1 style="text-align:center">บันทึกรายจ่าย</h1>
+    <div id="loading" class="sub">กำลังตรวจสอบระบบ...</div>
+    <form id="setupForm" class="hidden">
+      <p class="sub">สร้างบัญชีเจ้าของระบบครั้งแรก</p>
+      <label>ชื่อผู้ใช้</label><input id="newUsername" required minlength="3" autocomplete="username">
+      <label>ตั้งรหัสผ่าน (อย่างน้อย 10 ตัวอักษร)</label><input id="newPassword" type="password" required minlength="10" autocomplete="new-password">
+      <label>ยืนยันรหัสผ่าน</label><input id="confirmPassword" type="password" required autocomplete="new-password">
+      <button class="btn full" id="setupButton">สร้างบัญชีเจ้าของ</button><div id="setupMessage" class="msg"></div>
+    </form>
+    <form id="loginForm" class="hidden">
+      <p class="sub">กรุณาเข้าสู่ระบบเพื่อใช้งาน</p>
+      <label>ชื่อผู้ใช้</label><input id="username" required autocomplete="username">
+      <label>รหัสผ่าน</label><input id="password" type="password" required autocomplete="current-password">
+      <button class="btn full" id="loginButton">เข้าสู่ระบบ</button><div id="loginMessage" class="msg"></div>
+    </form>
+  </section>
+
+  <main id="app" class="hidden">
+    <div class="top panel">
+      <div><h2>👛 บันทึกรายจ่าย</h2><div class="status" id="connection">กำลังตรวจสอบการเชื่อมต่อ...</div></div>
+      <div class="row" style="flex:0 0 auto"><button class="btn danger" id="logout">↪ ออกจากระบบ</button></div>
+    </div>
+    <section id="home" class="panel">
+      <p class="sub">เมนูหลัก</p>
+      <div class="grid">
+        <button class="menu" data-page="expenses"><span>👛</span>บันทึกรายจ่าย</button>
+        <button class="menu" data-page="reports"><span>📊</span>รายงาน</button>
+        <button class="menu" data-page="sync"><span>🔄</span>Sync</button>
+        <button class="menu" data-page="settings"><span>⚙️</span>ตั้งค่า</button>
+      </div>
+    </section>
+
+    <section id="expenses" class="panel hidden">
+      <div class="top"><h2>👛 บันทึกรายจ่าย</h2><button class="btn secondary" data-home>กลับหน้าหลัก</button></div>
+      <div class="tabs"><button class="btn" id="showEntry">✍️ ลงข้อมูลการซื้อ</button><button class="btn secondary" id="showReceipt">🧾 ถ่ายภาพใบเสร็จ</button><button class="btn secondary" id="showHistory">📋 รายละเอียดการซื้อ</button></div>
+      <div id="entry">
+        <form id="expenseForm">
+          <input type="hidden" id="recordId">
+          <input type="hidden" id="recordVersion">
+          <label>วันที่</label><input id="date" type="date" required>
+          <label>หมวดหมู่</label><select id="category" required></select>
+          <label>รายการ</label><input id="itemName" list="itemSuggestions" placeholder="พิมพ์หรือเลือกชื่อรายการ" required><datalist id="itemSuggestions"></datalist>
+          <label>จำนวนเงิน (บาท)</label><input id="amount" type="number" min="0.01" step="0.01" required>
+          <button type="button" class="note-toggle" id="toggleNote" aria-expanded="false">＋ เพิ่มหมายเหตุ (ถ้ามี)</button><div id="noteWrap" class="hidden"><label for="note">หมายเหตุ</label><textarea id="note" placeholder="ไม่บังคับ"></textarea></div>
+          <div class="row" style="margin-top:14px"><button class="btn" type="submit" id="saveExpense">💾 บันทึกรายจ่าย</button><button class="btn secondary" type="button" id="clearForm">🧹 ล้างข้อมูล</button></div>
+          <div id="expenseMessage" class="msg"></div>
+        </form>
+      </div>
+      <div id="receipt" class="hidden">
+        <p class="small">เลือกหมวดหมู่ก่อนถ่ายภาพหรือเลือกรูป ระบบจะอ่านข้อความด้วย OCR บนเบราว์เซอร์โดยไม่ส่งรูปไปเก็บบนเซิร์ฟเวอร์</p>
+        <label>หมวดหมู่ของรายการในใบเสร็จ</label><select id="receiptCategory"><option value="">เลือกหมวดหมู่</option></select>
+        <div class="receipt-actions">
+          <button type="button" class="btn secondary receipt-action" id="takeReceipt"><span class="action-icon" aria-hidden="true">📷</span><span>ถ่ายรูป</span></button>
+          <button type="button" class="btn secondary receipt-action" id="chooseReceipt"><span class="action-icon" aria-hidden="true">🖼️</span><span>เลือกรูปจากเครื่อง</span></button>
+        </div>
+        <input id="receiptFile" type="file" accept="image/*" capture="environment" class="hidden">
+        <img id="receiptPreview" class="receipt-preview hidden" alt="ภาพใบเสร็จ (แตะภาพเพื่อขยาย)">
+        <p class="small" id="ocrEngineStatus">ระบบ OCR ฟรี: ต้องเชื่อมต่ออินเทอร์เน็ตเพื่อโหลดตัวอ่านภาษาไทย/อังกฤษครั้งแรก</p>
+        <button type="button" class="btn full" id="runOcr" disabled>อ่านข้อความจากใบเสร็จ</button>
+        <div id="ocrProgress" class="small"></div>
+        <div id="ocrEditor" class="hidden">
+          <label>วันที่ในใบเสร็จ</label><input id="receiptDate" type="date">
+          <p class="small">ตรวจสอบชื่อรายการและราคาให้ถูกต้องก่อนบันทึก รายการที่ระบบไม่มั่นใจจะแสดงคำเตือน</p>
+          <div id="ocrRows"></div>
+          <div class="row" style="margin-top:12px"><button type="button" class="btn secondary" id="addOcrRow">เพิ่มรายการ</button><button type="button" class="btn" id="saveOcrRows">บันทึกรายการที่ตรวจแล้ว</button></div>
+          <div id="ocrSaveMessage" class="msg"></div>
+        </div>
+        <textarea id="ocrRawText" class="hidden" rows="6" placeholder="ข้อความ OCR ที่อ่านได้"></textarea>
+      </div>
+      <div id="history" class="hidden"><div class="row"><div><label>เลือกวันที่</label><input id="historyDate" type="date"></div><div><label>ค้นหารายการ</label><input id="searchItem" placeholder="ค้นหาชื่อรายการ"></div></div><div id="recordList"></div></div>
+    </section>
+
+    <section id="reports" class="panel hidden">
+      <div class="top"><h2>📊 รายงานสรุป</h2><button class="btn secondary" data-home>กลับหน้าหลัก</button></div>
+      <div class="row"><div><label>ตั้งแต่วันที่</label><input id="reportFrom" type="date"></div><div><label>ถึงวันที่</label><input id="reportTo" type="date"></div></div>
+      <div class="card"><div class="small">ยอดรวมตามช่วงวันที่</div><div class="stat" id="totalAmount">0.00 บาท</div></div>
+      <div id="reportList"></div>
+    </section>
+
+    <section id="sync" class="panel hidden">
+      <div class="top"><h2>🔄 Sync</h2><button class="btn secondary" data-home>กลับหน้าหลัก</button></div>
+      <p>ข้อมูลที่บันทึกในเครื่องจะถูกส่งไปยัง Google Sheets เมื่อมีอินเทอร์เน็ต</p>
+      <div class="card"><div>รายการทั้งหมดในเครื่อง</div><div class="stat" id="localCount">0</div><div class="small" id="pendingCount">รอซิงก์ 0 รายการ</div></div>
+      <button class="btn full" id="syncNow">ซิงก์ข้อมูลตอนนี้</button><div id="syncMessage" class="msg"></div>
+    </section>
+
+    <section id="settings" class="panel hidden">
+      <div class="top"><h2>⚙️ ตั้งค่า</h2><button class="btn secondary" data-home>กลับหน้าหลัก</button></div>
+      <h3>จัดการหมวดหมู่</h3>
+      <form id="categoryForm" class="row"><input id="newCategory" placeholder="ชื่อหมวดหมู่ใหม่" required maxlength="40"><button class="btn">เพิ่มหมวดหมู่</button></form>
+      <div id="categoryList"></div>
+      <p class="small">การตั้งค่าเก็บข้อมูลในเครื่องและสำรองข้อมูลอัตโนมัติ จะเพิ่มในขั้นตอนถัดไป</p>
+    </section>
+  </main>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script>
+'use strict';
+const $=id=>document.getElementById(id);
+const DB_NAME='expense_offline_db', DB_VERSION=1, STORE='records';
+let db=null, token='', categories=[], records=[], busy=false, receiptImageUrl='', ocrWorker=null, ocrRowsData=[];
+function openDB(){return new Promise((resolve,reject)=>{const req=indexedDB.open(DB_NAME,DB_VERSION);req.onupgradeneeded=()=>{const d=req.result;if(!d.objectStoreNames.contains(STORE)){const st=d.createObjectStore(STORE,{keyPath:'recordId'});st.createIndex('syncStatus','syncStatus',{unique:false});}};req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});}
+function tx(mode,fn){return new Promise((resolve,reject)=>{const t=db.transaction(STORE,mode),st=t.objectStore(STORE);let result;try{result=fn(st);}catch(e){reject(e);return;}t.oncomplete=()=>resolve(result&&result.result!==undefined?result.result:result);t.onerror=()=>reject(t.error);t.onabort=()=>reject(t.error);});}
+function allLocal(){return new Promise((resolve,reject)=>{const r=db.transaction(STORE).objectStore(STORE).getAll();r.onsuccess=()=>resolve(r.result||[]);r.onerror=()=>reject(r.error);});}
+function putLocal(v){return new Promise((resolve,reject)=>{const r=db.transaction(STORE,'readwrite').objectStore(STORE).put(v);r.onsuccess=()=>resolve();r.onerror=()=>reject(r.error);});}
+function removeLocal(id){return new Promise((resolve,reject)=>{const r=db.transaction(STORE,'readwrite').objectStore(STORE).delete(id);r.onsuccess=()=>resolve();r.onerror=()=>reject(r.error);});}
+const GAS_WEB_APP_URL='https://script.google.com/macros/s/AKfycbwlu79q4DAV9xKUVSUmqeucTghJSyqOBb18CSZajSvrVROW0l2Y6mMIf8/exec';
+let apiFrame=null, apiReady=false, apiWaiters=[], apiCalls=new Map(), apiSeq=0;
+function initApiBridge(){if(apiFrame)return;apiFrame=document.createElement('iframe');apiFrame.title='Google Apps Script API';apiFrame.setAttribute('aria-hidden','true');apiFrame.style.cssText='position:absolute;width:1px;height:1px;left:-9999px;border:0';apiFrame.src=GAS_WEB_APP_URL+'?bridge=1';document.body.appendChild(apiFrame);apiFrame.addEventListener('load',()=>{ /* bridge announces readiness via postMessage */ });}
+window.addEventListener('message',event=>{if(!apiFrame||event.source!==apiFrame.contentWindow)return;const d=event.data||{};if(d.type==='EXPENSE_BRIDGE_READY'){apiReady=true;apiWaiters.splice(0).forEach(fn=>fn());return;}if(d.type==='EXPENSE_API_RESULT'&&apiCalls.has(d.id)){const p=apiCalls.get(d.id);apiCalls.delete(d.id);clearTimeout(p.timer);d.ok?p.resolve(d.value):p.reject(new Error(d.error||'เชื่อมต่อระบบไม่สำเร็จ'));}});
+function waitApiReady(){return new Promise((resolve,reject)=>{if(apiReady)return resolve();initApiBridge();const timer=setTimeout(()=>reject(new Error('ติดต่อ Google Apps Script ไม่สำเร็จ กรุณาตรวจสอบอินเทอร์เน็ตและ URL การเผยแพร่')),20000);apiWaiters.push(()=>{clearTimeout(timer);resolve();});});}
+function server(method,...args){return new Promise(async(resolve,reject)=>{try{await waitApiReady();const id=String(++apiSeq);const timer=setTimeout(()=>{apiCalls.delete(id);reject(new Error('ระบบตอบกลับช้าเกินไป กรุณาลองอีกครั้ง'));},30000);apiCalls.set(id,{resolve,reject,timer});apiFrame.contentWindow.postMessage({type:'EXPENSE_API_CALL',id,method,args},'*');}catch(e){reject(e);}});}
+function showMsg(id,msg,isError=true){$(id).textContent=msg||'';$(id).style.color=isError?'var(--red)':'var(--green)';}
+function today(){const d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');}
+function showPage(id){['home','expenses','reports','sync','settings'].forEach(x=>$(x).classList.toggle('hidden',x!==id));if(id==='expenses')showExpenseTab('entry');}
+function toggleConnection(){const el=$('connection');el.textContent=navigator.onLine?'ออนไลน์':'ออฟไลน์ — บันทึกในเครื่อง';el.className='status '+(navigator.onLine?'online':'offline');}
+async function deriveHash(password,saltB64){const salt=Uint8Array.from(atob(saltB64),c=>c.charCodeAt(0));const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(password),'PBKDF2',false,['deriveBits']);const bits=await crypto.subtle.deriveBits({name:'PBKDF2',salt,iterations:100000,hash:'SHA-256'},key,256);return 'PBKDF2-SHA256$100000$'+btoa(String.fromCharCode(...new Uint8Array(bits)));}
+async function checkSetup(){
+ token=localStorage.getItem('expenseSessionToken')||'';
+ if(!navigator.onLine){$('loading').classList.add('hidden');if(token){await enterApp();return;}$('loading').textContent='ต้องเชื่อมต่ออินเทอร์เน็ตเพื่อสมัครหรือเข้าสู่ระบบครั้งแรก';$('loading').classList.remove('hidden');return;}
+ try{const r=await server('getSetupStatus');$('loading').classList.add('hidden');if(!r||typeof r.ownerExists!=='boolean')throw Error('ข้อมูลสถานะระบบไม่ถูกต้อง');if(!r.ownerExists){$('setupForm').classList.remove('hidden');return;}if(token){const s=await server('checkSession',token);if(s&&s.valid){await enterApp();return;}localStorage.removeItem('expenseSessionToken');token='';} $('loginForm').classList.remove('hidden');
+ }catch(e){$('loading').textContent='ตรวจสอบระบบไม่สำเร็จ: '+e.message;$('loading').classList.remove('hidden');}
+}
+$('setupForm').addEventListener('submit',async e=>{e.preventDefault();const u=$('newUsername').value.trim(),p=$('newPassword').value;if(p!==$('confirmPassword').value){showMsg('setupMessage','รหัสผ่านทั้งสองช่องไม่ตรงกัน');return;}if(p.length<10){showMsg('setupMessage','รหัสผ่านต้องมีอย่างน้อย 10 ตัวอักษร');return;}const saltBytes=crypto.getRandomValues(new Uint8Array(16)),salt=btoa(String.fromCharCode(...saltBytes));$('setupButton').disabled=true;try{const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(p),'PBKDF2',false,['deriveBits']);const bits=await crypto.subtle.deriveBits({name:'PBKDF2',salt:saltBytes,iterations:100000,hash:'SHA-256'},key,256);const hash='PBKDF2-SHA256$100000$'+btoa(String.fromCharCode(...new Uint8Array(bits)));await server('setupOwner',u,hash,salt);$('setupForm').classList.add('hidden');$('loginForm').classList.remove('hidden');$('username').value=u;showMsg('loginMessage','สร้างบัญชีสำเร็จ กรุณาเข้าสู่ระบบ',false);}catch(err){showMsg('setupMessage',err.message);}finally{$('setupButton').disabled=false;}});
+$('loginForm').addEventListener('submit',async e=>{e.preventDefault();const u=$('username').value.trim(),p=$('password').value;$('loginButton').disabled=true;showMsg('loginMessage','กำลังตรวจสอบ...',false);try{const s=await server('getLoginSalt',u);if(!s||!s.salt)throw Error('ไม่พบชื่อผู้ใช้นี้');const hash=await deriveHash(p,s.salt);const r=await server('login',u,hash);if(!r||r.success!==true||!r.token)throw Error('เข้าสู่ระบบไม่สำเร็จ');token=r.token;localStorage.setItem('expenseSessionToken',token);await enterApp();}catch(err){showMsg('loginMessage',err.message);}finally{$('loginButton').disabled=false;}});
+async function enterApp(){$('auth').classList.add('hidden');$('app').classList.remove('hidden');await loadLocal();showPage('home');toggleConnection();if(navigator.onLine)syncNow(false);}
+async function loadLocal(){records=await allLocal();try{categories=JSON.parse(localStorage.getItem('expenseCategoriesCache')||'[]');}catch(e){categories=[];}renderAll();}
+function renderCategories(){const sel=$('category');const old=sel.value;sel.innerHTML='<option value="">เลือกหมวดหมู่</option>'+categories.map(c=>`<option value="${esc(c.categoryId)}">${esc(c.name)}</option>`).join('');if(categories.some(c=>c.categoryId===old))sel.value=old;else{const food=categories.find(c=>c.name==='อาหาร');if(food)sel.value=food.categoryId;}const receiptSel=$('receiptCategory');const receiptOld=receiptSel.value;receiptSel.innerHTML='<option value="">เลือกหมวดหมู่</option>'+categories.map(c=>`<option value="${esc(c.categoryId)}">${esc(c.name)}</option>`).join('');if(categories.some(c=>c.categoryId===receiptOld))receiptSel.value=receiptOld;$('categoryList').innerHTML=categories.map(c=>`<div class="item"><span>${esc(c.name)}</span><button class="btn danger" data-delcat="${esc(c.categoryId)}">ปิดใช้งาน</button></div>`).join('');}
+function renderSuggestions(){const counts={};records.forEach(r=>{counts[r.itemName]=(counts[r.itemName]||0)+1;});$('itemSuggestions').innerHTML=Object.keys(counts).sort((a,b)=>counts[b]-counts[a]).map(n=>`<option value="${esc(n)}"></option>`).join('');}
+function renderHistory(){const d=$('historyDate').value,q=$('searchItem').value.trim().toLowerCase();const list=records.filter(r=>(!d||r.date===d)&&(!q||r.itemName.toLowerCase().includes(q))).sort((a,b)=>b.date.localeCompare(a.date)||String(b.updatedAt||'').localeCompare(String(a.updatedAt||'')));$('recordList').innerHTML=list.length?list.map(r=>`<div class="item"><div><b>${esc(r.itemName)}</b><div class="small">${esc(r.date)} · ${esc(r.categoryName||'')}</div>${r.note?`<div class="small">${esc(r.note)}</div>`:''}<div class="small">${r.syncStatus==='synced'?'ซิงก์แล้ว':r.syncStatus==='conflict'?'ข้อมูลขัดแย้ง ต้องตรวจสอบ':'รอซิงก์'}</div>${r.syncStatus==='conflict'&&r.conflictMessage?`<div class="small" style="color:var(--red)">${esc(r.conflictMessage)}</div>`:''}</div><div style="text-align:right"><div class="amount">${money(r.amount)} บาท</div><div class="actions"><button class="btn secondary" data-edit="${esc(r.recordId)}">แก้ไข</button><button class="btn danger" data-delete="${esc(r.recordId)}">ลบ</button></div></div></div>`).join(''):'<p class="sub">ยังไม่มีรายการในวันที่เลือก</p>';}
+function renderReport(){const from=$('reportFrom').value,to=$('reportTo').value;const list=records.filter(r=>(!from||r.date>=from)&&(!to||r.date<=to));const total=list.reduce((a,r)=>a+Number(r.amount||0),0);$('totalAmount').textContent=money(total)+' บาท';const sums={};list.forEach(r=>{const k=(r.categoryName||'')+'||'+r.itemName;sums[k]=(sums[k]||0)+Number(r.amount||0);});const vals=Object.entries(sums).sort((a,b)=>b[1]-a[1]);const max=Math.max(1,...vals.map(x=>x[1]));$('reportList').innerHTML=vals.map(([k,v])=>{const [cat,item]=k.split('||');return `<div class="card"><div class="row"><b>${esc(item)}</b><span class="amount">${money(v)} บาท</span></div><div class="small">${esc(cat)}</div><div style="height:9px;background:#edf3ef;border-radius:8px;margin-top:8px"><div style="height:9px;width:${Math.max(2,v/max*100)}%;background:var(--green);border-radius:8px"></div></div></div>`;}).join('')||'<p class="sub">ไม่มีข้อมูลในช่วงวันที่นี้</p>';}
+function renderAll(){renderCategories();renderSuggestions();renderHistory();renderReport();const pending=records.filter(r=>r.syncStatus!=='synced').length;$('localCount').textContent=records.length;$('pendingCount').textContent='รอซิงก์ '+pending+' รายการ';}
+function money(v){return Number(v||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function clearForm(options={}){const keepCategory=$('category').value;$('expenseForm').reset();$('recordId').value='';$('recordVersion').value='';$('date').value=today();if(categories.some(c=>c.categoryId===keepCategory))$('category').value=keepCategory;else{const food=categories.find(c=>c.name==='อาหาร');$('category').value=food?food.categoryId:'';} $('note').value='';$('noteWrap').classList.add('hidden');$('toggleNote').textContent='＋ เพิ่มหมายเหตุ (ถ้ามี)';$('toggleNote').setAttribute('aria-expanded','false');$('saveExpense').textContent='💾 บันทึกรายจ่าย';if(options.focusItem)$('itemName').focus();}
+$('expenseForm').addEventListener('submit',async e=>{e.preventDefault();const cat=categories.find(c=>c.categoryId===$('category').value);if(!cat){showMsg('expenseMessage','กรุณาเลือกหมวดหมู่');return;}const id=$('recordId').value||(crypto.randomUUID?crypto.randomUUID():('rec-'+Date.now()+'-'+Math.random().toString(16).slice(2)));const existing=records.find(r=>r.recordId===id);const obj={recordId:id,date:$('date').value,categoryId:cat.categoryId,categoryName:cat.name,itemName:$('itemName').value.trim(),amount:Number($('amount').value),note:$('note').value.trim(),source:'manual',expectedVersion:Number($('recordVersion').value||0),version:existing?.version||0,syncStatus:'pending',updatedAt:new Date().toISOString()};if(!obj.itemName||obj.amount<=0){showMsg('expenseMessage','กรุณากรอกรายการและจำนวนเงินให้ถูกต้อง');return;}try{await putLocal(obj);records=await allLocal();renderAll();clearForm({focusItem:true});showMsg('expenseMessage',navigator.onLine?'บันทึกในเครื่องแล้ว กำลังซิงก์':'บันทึกในเครื่องแล้ว รออินเทอร์เน็ตเพื่อซิงก์',false);if(navigator.onLine)await syncNow(false);}catch(err){showMsg('expenseMessage','บันทึกไม่สำเร็จ: '+err.message);}});
+$('clearForm').onclick=clearForm;
+$('toggleNote').onclick=()=>{const open=$('noteWrap').classList.contains('hidden');$('noteWrap').classList.toggle('hidden',!open);$('toggleNote').textContent=open?'− ซ่อนหมายเหตุ':'＋ เพิ่มหมายเหตุ (ถ้ามี)';$('toggleNote').setAttribute('aria-expanded',String(open));if(open)$('note').focus();};
+$('itemName').addEventListener('change',()=>{const name=$('itemName').value.trim();if(records.some(r=>r.itemName===name))$('amount').focus();});
+$('amount').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('saveExpense').focus();}});
+$('showEntry').onclick=()=>showExpenseTab('entry');
+$('showReceipt').onclick=()=>showExpenseTab('receipt');
+$('showHistory').onclick=()=>{showExpenseTab('history');renderHistory();};
+function showExpenseTab(tab){['entry','receipt','history'].forEach(x=>$(x).classList.toggle('hidden',x!==tab));$('showEntry').className='btn'+(tab==='entry'?'':' secondary');$('showReceipt').className='btn'+(tab==='receipt'?'':' secondary');$('showHistory').className='btn'+(tab==='history'?'':' secondary');if(tab==='receipt')renderReceiptCategories();}
+function renderReceiptCategories(){const sel=$('receiptCategory');const old=sel.value;sel.innerHTML='<option value="">เลือกหมวดหมู่</option>'+categories.map(c=>`<option value="${esc(c.categoryId)}">${esc(c.name)}</option>`).join('');if(categories.some(c=>c.categoryId===old))sel.value=old;}
+
+// OCR ใบเสร็จด้วย Tesseract.js ประมวลผลในเบราว์เซอร์ (ไม่มีค่าใช้บริการ OCR)
+$('takeReceipt').onclick=()=>{$('receiptFile').setAttribute('capture','environment');$('receiptFile').click();};
+$('chooseReceipt').onclick=()=>{$('receiptFile').removeAttribute('capture');$('receiptFile').click();};
+$('receiptFile').addEventListener('change',e=>{const f=e.target.files&&e.target.files[0];if(!f)return;if(!$('receiptCategory').value){$('receiptFile').value='';showMsg('ocrSaveMessage','กรุณาเลือกหมวดหมู่ก่อนถ่ายรูปหรือเลือกรูป');return;}if(!f.type.startsWith('image/')){showMsg('ocrSaveMessage','กรุณาเลือกไฟล์รูปภาพ');return;}if(receiptImageUrl)URL.revokeObjectURL(receiptImageUrl);receiptImageUrl=URL.createObjectURL(f);$('receiptPreview').src=receiptImageUrl;$('receiptPreview').classList.remove('hidden');$('runOcr').disabled=false;$('ocrEditor').classList.add('hidden');$('ocrProgress').textContent='เลือกรูปแล้ว พร้อมอ่านข้อความ';$('receiptDate').value=today();});
+$('receiptPreview').onclick=()=>{$('receiptPreview').classList.toggle('zoomed');};
+async function getOcrWorker(){if(ocrWorker)return ocrWorker;if(!window.Tesseract)throw Error('ยังโหลดโปรแกรม OCR ไม่สำเร็จ กรุณาเชื่อมต่ออินเทอร์เน็ตแล้วเปิดหน้าใหม่');$('ocrEngineStatus').textContent='กำลังเตรียมตัวอ่านภาษาไทยและอังกฤษ (ครั้งแรกอาจใช้เวลาสักครู่)...';ocrWorker=await Tesseract.createWorker('tha+eng',1,{workerPath:'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/worker.min.js',corePath:'https://cdn.jsdelivr.net/npm/tesseract.js-core@5',langPath:'https://tessdata.projectnaptha.com/4.0.0',logger:m=>{if(m.status==='loading language traineddata'||m.status==='recognizing text')$('ocrProgress').textContent=(m.status==='loading language traineddata'?'กำลังดาวน์โหลดชุดภาษา ':'กำลังอ่านข้อความ ')+Math.round((m.progress||0)*100)+'%';}});try{await ocrWorker.setParameters({preserve_interword_spaces:'1',tessedit_pageseg_mode:'6'});}catch(e){}return ocrWorker;}
+async function prepareReceiptImage(url){const img=await createImageBitmap(await (await fetch(url)).blob());const maxSide=2600,scale=Math.min(2.5,maxSide/Math.max(img.width,img.height));const w=Math.max(1,Math.round(img.width*scale)),h=Math.max(1,Math.round(img.height*scale));const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);ctx.drawImage(img,0,0,w,h);const data=ctx.getImageData(0,0,w,h),p=data.data;let min=255,max=0;for(let i=0;i<p.length;i+=4){const y=.299*p[i]+.587*p[i+1]+.114*p[i+2];if(y<min)min=y;if(y>max)max=y;}const contrast=max-min;for(let i=0;i<p.length;i+=4){let y=.299*p[i]+.587*p[i+1]+.114*p[i+2];y=(y-128)*1.35+128;y=Math.max(0,Math.min(255,y));p[i]=p[i+1]=p[i+2]=y;}ctx.putImageData(data,0,0);return canvas;}
+
+$('runOcr').onclick=async()=>{if(!$('receiptCategory').value){showMsg('ocrSaveMessage','กรุณาเลือกหมวดหมู่ก่อนอ่านข้อความ');return;}if(!receiptImageUrl)return;$('runOcr').disabled=true;$('ocrProgress').textContent='กำลังปรับภาพและอ่านข้อความ...';$('ocrEditor').classList.add('hidden');try{const worker=await getOcrWorker();const prepared=await prepareReceiptImage(receiptImageUrl);const result=await worker.recognize(prepared);const raw=(result.data.text||'').replace(/\r/g,'').trim();$('ocrRawText').value=raw;ocrRowsData=parseReceiptLines(raw,result.data.lines||[]);renderOcrRows();$('ocrEditor').classList.remove('hidden');if(ocrRowsData.length){$('ocrProgress').textContent='อ่านได้ '+ocrRowsData.length+' บรรทัด กรุณาตรวจสอบชื่อและราคาทุกรายการก่อนบันทึก';}else{$('ocrProgress').textContent='ยังไม่พบข้อความในภาพ ลองถ่ายใหม่ให้ตรงใบเสร็จ แสงสว่างเพียงพอ และให้ตัวหนังสือเต็มภาพ';addOcrRow();renderOcrRows();}}catch(err){$('ocrProgress').textContent='อ่านข้อความไม่สำเร็จ: '+(err&&err.message?err.message:String(err))+' — ตรวจสอบอินเทอร์เน็ตแล้วลองใหม่';}finally{$('runOcr').disabled=false;}};
+function parseReceiptLines(raw,ocrLines=[]){const lines=raw.split(/\n+/).map(x=>x.trim()).filter(x=>x.length>=2);const out=[];for(let i=0;i<lines.length;i++){const line=lines[i];if(/^(รวม|ยอดรวม|subtotal|total|vat|ภาษี|เงินสด|เงินทอน|change|cash|ส่วนลด|discount)/i.test(line))continue;const matches=[...line.matchAll(/(?:฿\s*)?((?:\d{1,3}(?:,\d{3})+)|\d+)(?:[.,](\d{2}))?(?=\s*(?:บาท|฿)?\s*$)/g)];let name=line,amount='',warning='ตรวจสอบราคาและข้อความอีกครั้ง';if(matches.length){const m=matches[matches.length-1];const parsed=Number((m[1]||'').replace(/,/g,'')+(m[2]!==undefined?'.'+m[2]:''));const candidate=line.slice(0,m.index).replace(/[\s:：xX×*-]+$/,'').trim();if(candidate&&Number.isFinite(parsed)&&parsed>0){name=candidate;amount=parsed;warning=m[2]===undefined?'ตรวจสอบราคาอีกครั้ง (ไม่พบจุดทศนิยม)':'';}}const meta=ocrLines[i];if(meta&&Number(meta.confidence)<55)warning='ความมั่นใจในการอ่านข้อความต่ำ กรุณาตรวจสอบ';out.push({name,amount,warning});}return out;}
+function renderOcrRows(){const host=$('ocrRows');host.innerHTML=ocrRowsData.map((r,i)=>`<div class="ocr-row"><input aria-label="ชื่อรายการ ${i+1}" data-ocr-name="${i}" value="${esc(r.name)}" placeholder="ชื่อรายการ"><input aria-label="ราคา ${i+1}" data-ocr-amount="${i}" type="number" min="0.01" step="0.01" value="${r.amount||''}" placeholder="ราคา"> <button type="button" class="btn danger" data-ocr-remove="${i}" aria-label="ลบรายการ">×</button>${r.warning?`<div class="warn">⚠ ${esc(r.warning)}</div>`:''}</div>`).join('')||'<p class="small">ยังไม่มีรายการ กดเพิ่มรายการได้</p>';}
+$('ocrRows').addEventListener('input',e=>{const n=e.target.dataset.ocrName,a=e.target.dataset.ocrAmount;if(n!==undefined)ocrRowsData[Number(n)].name=e.target.value;if(a!==undefined){ocrRowsData[Number(a)].amount=e.target.value;ocrRowsData[Number(a)].warning='';}});
+$('ocrRows').addEventListener('click',e=>{const i=e.target.dataset.ocrRemove;if(i===undefined)return;ocrRowsData.splice(Number(i),1);renderOcrRows();});
+$('addOcrRow').onclick=()=>{ocrRowsData.push({name:'',amount:'',warning:''});renderOcrRows();};
+$('saveOcrRows').onclick=async()=>{const cat=categories.find(c=>c.categoryId===$('receiptCategory').value);if(!cat){showMsg('ocrSaveMessage','กรุณาเลือกหมวดหมู่');return;}const date=$('receiptDate').value||today();const valid=ocrRowsData.filter(r=>String(r.name||'').trim()&&Number(r.amount)>0);if(!valid.length){showMsg('ocrSaveMessage','กรุณาตรวจสอบให้มีชื่อรายการและราคาที่ถูกต้องอย่างน้อย 1 รายการ');return;}const btn=$('saveOcrRows');btn.disabled=true;try{for(const r of valid){const rec={recordId:crypto.randomUUID?crypto.randomUUID():('rec-'+Date.now()+'-'+Math.random().toString(16).slice(2)),date,categoryId:cat.categoryId,categoryName:cat.name,itemName:String(r.name).trim(),amount:Number(r.amount),note:'นำเข้าจากใบเสร็จ (OCR)',source:'receipt',receiptId:'',expectedVersion:0,version:0,syncStatus:'pending',updatedAt:new Date().toISOString()};await putLocal(rec);}records=await allLocal();renderAll();showMsg('ocrSaveMessage','บันทึก '+valid.length+' รายการลงในเครื่องแล้ว'+(navigator.onLine?' กำลังซิงก์ข้อมูล':' รอซิงก์เมื่อมีอินเทอร์เน็ต'),false);if(navigator.onLine)await syncNow(false);ocrRowsData=[];renderOcrRows();$('receiptFile').value='';$('receiptPreview').classList.add('hidden');if(receiptImageUrl){URL.revokeObjectURL(receiptImageUrl);receiptImageUrl='';}$('runOcr').disabled=true;}catch(err){showMsg('ocrSaveMessage','บันทึกไม่สำเร็จ: '+err.message);}finally{btn.disabled=false;}};
+
+$('historyDate').value=today();$('date').value=today();$('historyDate').onchange=renderHistory;$('searchItem').oninput=renderHistory;
+$('recordList').addEventListener('click',async e=>{const edit=e.target.dataset.edit,del=e.target.dataset.delete;if(edit){const r=records.find(x=>x.recordId===edit);if(!r)return;$('recordId').value=r.recordId;$('recordVersion').value=r.version||0;$('date').value=r.date;$('category').value=r.categoryId;$('itemName').value=r.itemName;$('amount').value=r.amount;$('note').value=r.note||'';$('noteWrap').classList.toggle('hidden',!r.note);$('toggleNote').textContent=r.note?'− ซ่อนหมายเหตุ':'＋ เพิ่มหมายเหตุ (ถ้ามี)';$('toggleNote').setAttribute('aria-expanded',String(!!r.note));$('entry').classList.remove('hidden');$('history').classList.add('hidden');$('saveExpense').textContent='💾 บันทึกการแก้ไข';}if(del){if(!confirm('ต้องการลบรายการนี้หรือไม่?'))return;const r=records.find(x=>x.recordId===del);try{if(r.syncStatus==='synced'){const z=await server('deleteExpenseRecord',token,r.recordId,r.version);if(!z.success)throw Error(z.message||'ลบไม่สำเร็จ');}await removeLocal(del);records=await allLocal();renderAll();}catch(err){alert(err.message);}}});
+$('categoryForm').addEventListener('submit',async e=>{e.preventDefault();const name=$('newCategory').value.trim();if(!name)return;try{const r=await server('saveExpenseCategory',token,name,'');if(!r.success)throw Error('เพิ่มหมวดหมู่ไม่สำเร็จ');$('newCategory').value='';await refreshFromServer();}catch(err){alert(err.message);}});
+$('categoryList').addEventListener('click',async e=>{const id=e.target.dataset.delcat;if(!id||!confirm('ปิดใช้งานหมวดหมู่นี้หรือไม่?'))return;try{await server('deactivateExpenseCategory',token,id);await refreshFromServer();}catch(err){alert(err.message);}});
+async function refreshFromServer(){const r=await server('getExpenseAppData',token);categories=r.categories||[];const local=await allLocal();const pending=local.filter(x=>x.syncStatus!=='synced');const serverRows=r.records||[];for(const sr of serverRows){const old=local.find(x=>x.recordId===sr.recordId);if(!old||old.syncStatus==='synced')await putLocal({...sr,syncStatus:'synced',expectedVersion:sr.version||1});}records=await allLocal();renderAll();}
+async function syncNow(show=true){if(busy)return;if(!navigator.onLine){if(show)showMsg('syncMessage','ขณะนี้ออฟไลน์ ข้อมูลยังอยู่ในเครื่อง');return;}busy=true;if(show)showMsg('syncMessage','กำลังซิงก์ข้อมูล...',false);try{const remote=await server('getExpenseAppData',token);categories=remote.categories||[];localStorage.setItem('expenseCategoriesCache',JSON.stringify(categories));renderCategories();let local=await allLocal();const serverRows=remote.records||[];for(const sr of serverRows){const old=local.find(x=>x.recordId===sr.recordId);if(!old||old.syncStatus==='synced'){await putLocal({...sr,syncStatus:'synced',expectedVersion:Number(sr.version||1)});}else if(old.syncStatus==='pending'&&Number(old.expectedVersion||0)!==Number(sr.version||1)){await putLocal({...old,syncStatus:'conflict',conflictMessage:'รายการนี้ถูกแก้ไขจากอุปกรณ์อื่น กรุณาตรวจสอบก่อนซิงก์'});}}local=await allLocal();for(const r of local.filter(x=>x.syncStatus==='pending')){const payload={...r,expectedVersion:r.expectedVersion||0};delete payload.syncStatus;delete payload.version;const result=await server('saveExpenseRecord',token,payload);if(result&&result.success){await putLocal({...r,...result.record,syncStatus:'synced',version:result.record.version,expectedVersion:result.record.version});}else if(result&&result.conflict){await putLocal({...r,syncStatus:'conflict',conflictMessage:result.message});}else{throw Error(result?.message||'ซิงก์รายการไม่สำเร็จ');}}records=await allLocal();renderAll();if(show)showMsg('syncMessage','ซิงก์เสร็จแล้ว',false);}catch(err){if(show)showMsg('syncMessage','ซิงก์ไม่สำเร็จ: '+err.message);}finally{busy=false;}}
+$('syncNow').onclick=()=>syncNow(true);
+document.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>{showPage(b.dataset.page);if(b.dataset.page==='reports')renderReport();if(b.dataset.page==='sync')renderAll();});
+document.querySelectorAll('[data-home]').forEach(b=>b.onclick=()=>showPage('home'));
+$('reportFrom').onchange=renderReport;$('reportTo').onchange=renderReport;
+$('logout').onclick=async()=>{const t=token;localStorage.removeItem('expenseSessionToken');token='';try{if(t)await server('logout',t);}catch(e){}location.reload();};
+window.addEventListener('online',()=>{toggleConnection();if(token)syncNow(false);});window.addEventListener('offline',toggleConnection);
+if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));}
+(async()=>{try{db=await openDB();await checkSetup();}catch(e){$('loading').textContent='เปิดฐานข้อมูลในเครื่องไม่สำเร็จ: '+e.message;}})();
+</script>
+</body>
+</html>

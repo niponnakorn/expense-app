@@ -1,0 +1,10 @@
+{
+  "name": "บันทึกรายจ่าย",
+  "short_name": "รายจ่าย",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f2f7f3",
+  "theme_color": "#16845b",
+  "lang": "th"
+}
