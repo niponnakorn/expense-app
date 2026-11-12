@@ -169,7 +169,23 @@ function removeLocal(id){return new Promise((resolve,reject)=>{const r=db.transa
 const GAS_WEB_APP_URL='https://script.google.com/macros/s/AKfycbwlu79q4DAV9xKUVSUmqeucTghJSyqOBb18CSZajSvrVROW0l2Y6mMIf8Zawtp1VhqZ/exec';
 let apiFrame=null, apiReady=false, apiWaiters=[], apiCalls=new Map(), apiSeq=0;
 function initApiBridge(){if(apiFrame)return;apiFrame=document.createElement('iframe');apiFrame.title='Google Apps Script API';apiFrame.setAttribute('aria-hidden','true');apiFrame.style.cssText='position:absolute;width:1px;height:1px;left:-9999px;border:0';apiFrame.src=GAS_WEB_APP_URL+'?bridge=1';document.body.appendChild(apiFrame);apiFrame.addEventListener('load',()=>{ /* bridge announces readiness via postMessage */ });}
-window.addEventListener('message',event=>{if(!apiFrame||event.source!==apiFrame.contentWindow)return;const d=event.data||{};if(d.type==='EXPENSE_BRIDGE_READY'){apiReady=true;apiWaiters.splice(0).forEach(fn=>fn());return;}if(d.type==='EXPENSE_API_RESULT'&&apiCalls.has(d.id)){const p=apiCalls.get(d.id);apiCalls.delete(d.id);clearTimeout(p.timer);d.ok?p.resolve(d.value):p.reject(new Error(d.error||'เชื่อมต่อระบบไม่สำเร็จ'));}});
+// Apps Script อาจ redirect จาก script.google.com ไปยัง googleusercontent.com
+const TRUSTED_GAS_ORIGIN=/^https:\/\/(?:script\.google\.com|[a-z0-9-]+\.googleusercontent\.com)$/i;
+window.addEventListener('message',event=>{
+ if(!apiFrame||!TRUSTED_GAS_ORIGIN.test(event.origin))return;
+ const d=event.data||{};
+ if(d.type==='EXPENSE_BRIDGE_READY'){
+  apiReady=true;
+  apiWaiters.splice(0).forEach(fn=>fn());
+  return;
+ }
+ if(d.type==='EXPENSE_API_RESULT'&&apiCalls.has(d.id)){
+  const p=apiCalls.get(d.id);
+  apiCalls.delete(d.id);
+  clearTimeout(p.timer);
+  d.ok?p.resolve(d.value):p.reject(new Error(d.error||'เชื่อมต่อระบบไม่สำเร็จ'));
+ }
+});
 function waitApiReady(){return new Promise((resolve,reject)=>{if(apiReady)return resolve();initApiBridge();const timer=setTimeout(()=>reject(new Error('ติดต่อ Google Apps Script ไม่สำเร็จ กรุณาตรวจสอบอินเทอร์เน็ตและ URL การเผยแพร่')),20000);apiWaiters.push(()=>{clearTimeout(timer);resolve();});});}
 function server(method,...args){return new Promise(async(resolve,reject)=>{try{await waitApiReady();const id=String(++apiSeq);const timer=setTimeout(()=>{apiCalls.delete(id);reject(new Error('ระบบตอบกลับช้าเกินไป กรุณาลองอีกครั้ง'));},30000);apiCalls.set(id,{resolve,reject,timer});apiFrame.contentWindow.postMessage({type:'EXPENSE_API_CALL',id,method,args},'*');}catch(e){reject(e);}});}
 function showMsg(id,msg,isError=true){$(id).textContent=msg||'';$(id).style.color=isError?'var(--red)':'var(--green)';}
