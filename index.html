@@ -155,7 +155,6 @@ textarea{min-height:72px;resize:vertical}
     </section>
   </main>
 </div>
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script>
 'use strict';
 const $=id=>document.getElementById(id);
@@ -195,9 +194,48 @@ function toggleConnection(){const el=$('connection');el.textContent=navigator.on
 async function deriveHash(password,saltB64){const salt=Uint8Array.from(atob(saltB64),c=>c.charCodeAt(0));const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(password),'PBKDF2',false,['deriveBits']);const bits=await crypto.subtle.deriveBits({name:'PBKDF2',salt,iterations:100000,hash:'SHA-256'},key,256);return 'PBKDF2-SHA256$100000$'+btoa(String.fromCharCode(...new Uint8Array(bits)));}
 async function checkSetup(){
  token=localStorage.getItem('expenseSessionToken')||'';
- if(!navigator.onLine){$('loading').classList.add('hidden');if(token){await enterApp();return;}$('loading').textContent='ต้องเชื่อมต่ออินเทอร์เน็ตเพื่อสมัครหรือเข้าสู่ระบบครั้งแรก';$('loading').classList.remove('hidden');return;}
- try{const r=await server('getSetupStatus');$('loading').classList.add('hidden');if(!r||typeof r.ownerExists!=='boolean')throw Error('ข้อมูลสถานะระบบไม่ถูกต้อง');if(!r.ownerExists){$('setupForm').classList.remove('hidden');return;}if(token){const s=await server('checkSession',token);if(s&&s.valid){await enterApp();return;}localStorage.removeItem('expenseSessionToken');token='';} $('loginForm').classList.remove('hidden');
- }catch(e){$('loading').textContent='ตรวจสอบระบบไม่สำเร็จ: '+e.message;$('loading').classList.remove('hidden');}
+ $('loading').classList.add('hidden');
+ // อุปกรณ์ที่เคยล็อกอินแล้วให้เข้าแอปจากข้อมูลในเครื่องก่อนเสมอ
+ // การตรวจสอบ Session และ Sync จะทำเบื้องหลังเมื่อมีอินเทอร์เน็ต
+ if(token){
+   await enterApp();
+   if(navigator.onLine) validateSessionInBackground();
+   return;
+ }
+ if(!navigator.onLine){
+   $('loading').textContent='อุปกรณ์นี้ยังไม่เคยเข้าสู่ระบบ กรุณาเชื่อมต่ออินเทอร์เน็ตเพื่อล็อกอินครั้งแรก';
+   $('loading').classList.remove('hidden');
+   return;
+ }
+ try{
+   const r=await server('getSetupStatus');
+   if(!r||typeof r.ownerExists!=='boolean')throw Error('ข้อมูลสถานะระบบไม่ถูกต้อง');
+   if(!r.ownerExists){$('setupForm').classList.remove('hidden');return;}
+   $('loginForm').classList.remove('hidden');
+ }catch(e){
+   $('loading').textContent='เชื่อมต่อระบบไม่ได้ กรุณาตรวจสอบอินเทอร์เน็ต แล้วลองใหม่อีกครั้ง: '+e.message;
+   $('loading').classList.remove('hidden');
+ }
+}
+async function validateSessionInBackground(){
+ const checkedToken=token;
+ if(!checkedToken||!navigator.onLine)return;
+ try{
+   const s=await server('checkSession',checkedToken);
+   // ปฏิเสธเฉพาะกรณีเซิร์ฟเวอร์ตอบชัดเจนว่า Session ใช้ไม่ได้
+   if(s&&s.valid===false&&token===checkedToken){
+     localStorage.removeItem('expenseSessionToken');
+     token='';
+     $('app').classList.add('hidden');
+     $('auth').classList.remove('hidden');
+     $('loading').textContent='Session หมดอายุหรือถูกยกเลิก กรุณาเข้าสู่ระบบอีกครั้ง (ข้อมูลในเครื่องยังคงอยู่)';
+     $('loading').classList.remove('hidden');
+     $('loginForm').classList.remove('hidden');
+   }
+ }catch(e){
+   // หากตรวจสอบไม่ได้เพราะเครือข่าย/Bridge ขัดข้อง ให้คงการเข้าใช้งานออฟไลน์ไว้
+   console.warn('ตรวจสอบ Session เบื้องหลังไม่สำเร็จ:',e);
+ }
 }
 $('setupForm').addEventListener('submit',async e=>{e.preventDefault();const u=$('newUsername').value.trim(),p=$('newPassword').value;if(p!==$('confirmPassword').value){showMsg('setupMessage','รหัสผ่านทั้งสองช่องไม่ตรงกัน');return;}if(p.length<10){showMsg('setupMessage','รหัสผ่านต้องมีอย่างน้อย 10 ตัวอักษร');return;}const saltBytes=crypto.getRandomValues(new Uint8Array(16)),salt=btoa(String.fromCharCode(...saltBytes));$('setupButton').disabled=true;try{const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(p),'PBKDF2',false,['deriveBits']);const bits=await crypto.subtle.deriveBits({name:'PBKDF2',salt:saltBytes,iterations:100000,hash:'SHA-256'},key,256);const hash='PBKDF2-SHA256$100000$'+btoa(String.fromCharCode(...new Uint8Array(bits)));await server('setupOwner',u,hash,salt);$('setupForm').classList.add('hidden');$('loginForm').classList.remove('hidden');$('username').value=u;showMsg('loginMessage','สร้างบัญชีสำเร็จ กรุณาเข้าสู่ระบบ',false);}catch(err){showMsg('setupMessage',err.message);}finally{$('setupButton').disabled=false;}});
 $('loginForm').addEventListener('submit',async e=>{e.preventDefault();const u=$('username').value.trim(),p=$('password').value;$('loginButton').disabled=true;showMsg('loginMessage','กำลังตรวจสอบ...',false);try{const s=await server('getLoginSalt',u);if(!s||!s.salt)throw Error('ไม่พบชื่อผู้ใช้นี้');const hash=await deriveHash(p,s.salt);const r=await server('login',u,hash);if(!r||r.success!==true||!r.token)throw Error('เข้าสู่ระบบไม่สำเร็จ');token=r.token;localStorage.setItem('expenseSessionToken',token);await enterApp();}catch(err){showMsg('loginMessage',err.message);}finally{$('loginButton').disabled=false;}});
@@ -227,7 +265,20 @@ $('takeReceipt').onclick=()=>{$('receiptFile').setAttribute('capture','environme
 $('chooseReceipt').onclick=()=>{$('receiptFile').removeAttribute('capture');$('receiptFile').click();};
 $('receiptFile').addEventListener('change',e=>{const f=e.target.files&&e.target.files[0];if(!f)return;if(!$('receiptCategory').value){$('receiptFile').value='';showMsg('ocrSaveMessage','กรุณาเลือกหมวดหมู่ก่อนถ่ายรูปหรือเลือกรูป');return;}if(!f.type.startsWith('image/')){showMsg('ocrSaveMessage','กรุณาเลือกไฟล์รูปภาพ');return;}if(receiptImageUrl)URL.revokeObjectURL(receiptImageUrl);receiptImageUrl=URL.createObjectURL(f);$('receiptPreview').src=receiptImageUrl;$('receiptPreview').classList.remove('hidden');$('runOcr').disabled=false;$('ocrEditor').classList.add('hidden');$('ocrProgress').textContent='เลือกรูปแล้ว พร้อมอ่านข้อความ';$('receiptDate').value=today();});
 $('receiptPreview').onclick=()=>{$('receiptPreview').classList.toggle('zoomed');};
-async function getOcrWorker(){if(ocrWorker)return ocrWorker;if(!window.Tesseract)throw Error('ยังโหลดโปรแกรม OCR ไม่สำเร็จ กรุณาเชื่อมต่ออินเทอร์เน็ตแล้วเปิดหน้าใหม่');$('ocrEngineStatus').textContent='กำลังเตรียมตัวอ่านภาษาไทยและอังกฤษ (ครั้งแรกอาจใช้เวลาสักครู่)...';ocrWorker=await Tesseract.createWorker('tha+eng',1,{workerPath:'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/worker.min.js',corePath:'https://cdn.jsdelivr.net/npm/tesseract.js-core@5',langPath:'https://tessdata.projectnaptha.com/4.0.0',logger:m=>{if(m.status==='loading language traineddata'||m.status==='recognizing text')$('ocrProgress').textContent=(m.status==='loading language traineddata'?'กำลังดาวน์โหลดชุดภาษา ':'กำลังอ่านข้อความ ')+Math.round((m.progress||0)*100)+'%';}});try{await ocrWorker.setParameters({preserve_interword_spaces:'1',tessedit_pageseg_mode:'6'});}catch(e){}return ocrWorker;}
+let tesseractLoadPromise=null;
+function loadTesseractScript(){
+ if(window.Tesseract)return Promise.resolve();
+ if(tesseractLoadPromise)return tesseractLoadPromise;
+ tesseractLoadPromise=new Promise((resolve,reject)=>{
+   const script=document.createElement('script');
+   script.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+   script.onload=()=>window.Tesseract?resolve():reject(new Error('โหลดโปรแกรม OCR ไม่สำเร็จ'));
+   script.onerror=()=>reject(new Error('โหลดโปรแกรม OCR ไม่สำเร็จ กรุณาเชื่อมต่ออินเทอร์เน็ต'));
+   document.head.appendChild(script);
+ }).catch(err=>{tesseractLoadPromise=null;throw err;});
+ return tesseractLoadPromise;
+}
+async function getOcrWorker(){if(ocrWorker)return ocrWorker;$('ocrEngineStatus').textContent='กำลังเตรียมตัวอ่านภาษาไทยและอังกฤษ (ครั้งแรกอาจใช้เวลาสักครู่)...';await loadTesseractScript();ocrWorker=await Tesseract.createWorker('tha+eng',1,{workerPath:'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/worker.min.js',corePath:'https://cdn.jsdelivr.net/npm/tesseract.js-core@5',langPath:'https://tessdata.projectnaptha.com/4.0.0',logger:m=>{if(m.status==='loading language traineddata'||m.status==='recognizing text')$('ocrProgress').textContent=(m.status==='loading language traineddata'?'กำลังดาวน์โหลดชุดภาษา ':'กำลังอ่านข้อความ ')+Math.round((m.progress||0)*100)+'%';}});try{await ocrWorker.setParameters({preserve_interword_spaces:'1',tessedit_pageseg_mode:'6'});}catch(e){}return ocrWorker;}
 async function prepareReceiptImage(url){const img=await createImageBitmap(await (await fetch(url)).blob());const maxSide=2600,scale=Math.min(2.5,maxSide/Math.max(img.width,img.height));const w=Math.max(1,Math.round(img.width*scale)),h=Math.max(1,Math.round(img.height*scale));const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);ctx.drawImage(img,0,0,w,h);const data=ctx.getImageData(0,0,w,h),p=data.data;let min=255,max=0;for(let i=0;i<p.length;i+=4){const y=.299*p[i]+.587*p[i+1]+.114*p[i+2];if(y<min)min=y;if(y>max)max=y;}const contrast=max-min;for(let i=0;i<p.length;i+=4){let y=.299*p[i]+.587*p[i+1]+.114*p[i+2];y=(y-128)*1.35+128;y=Math.max(0,Math.min(255,y));p[i]=p[i+1]=p[i+2]=y;}ctx.putImageData(data,0,0);return canvas;}
 
 $('runOcr').onclick=async()=>{if(!$('receiptCategory').value){showMsg('ocrSaveMessage','กรุณาเลือกหมวดหมู่ก่อนอ่านข้อความ');return;}if(!receiptImageUrl)return;$('runOcr').disabled=true;$('ocrProgress').textContent='กำลังปรับภาพและอ่านข้อความ...';$('ocrEditor').classList.add('hidden');try{const worker=await getOcrWorker();const prepared=await prepareReceiptImage(receiptImageUrl);const result=await worker.recognize(prepared);const raw=(result.data.text||'').replace(/\r/g,'').trim();$('ocrRawText').value=raw;ocrRowsData=parseReceiptLines(raw,result.data.lines||[]);renderOcrRows();$('ocrEditor').classList.remove('hidden');if(ocrRowsData.length){$('ocrProgress').textContent='อ่านได้ '+ocrRowsData.length+' บรรทัด กรุณาตรวจสอบชื่อและราคาทุกรายการก่อนบันทึก';}else{$('ocrProgress').textContent='ยังไม่พบข้อความในภาพ ลองถ่ายใหม่ให้ตรงใบเสร็จ แสงสว่างเพียงพอ และให้ตัวหนังสือเต็มภาพ';addOcrRow();renderOcrRows();}}catch(err){$('ocrProgress').textContent='อ่านข้อความไม่สำเร็จ: '+(err&&err.message?err.message:String(err))+' — ตรวจสอบอินเทอร์เน็ตแล้วลองใหม่';}finally{$('runOcr').disabled=false;}};
