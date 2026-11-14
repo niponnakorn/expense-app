@@ -1,4 +1,4 @@
-const CACHE_NAME = 'expense-app-shell-v5';
+const CACHE_NAME = 'expense-app-shell-v6';
 const CACHE_PREFIX = 'expense-app-shell-';
 const APP_SHELL = ['./', './index.html', './manifest.webmanifest'];
 const INDEX_URL = new URL('./index.html', self.registration.scope).href;
