@@ -171,11 +171,17 @@ function allLocal(){return new Promise((resolve,reject)=>{const r=db.transaction
 function putLocal(v){return new Promise((resolve,reject)=>{const r=db.transaction(STORE,'readwrite').objectStore(STORE).put(v);r.onsuccess=()=>resolve();r.onerror=()=>reject(r.error);});}
 function removeLocal(id){return new Promise((resolve,reject)=>{const r=db.transaction(STORE,'readwrite').objectStore(STORE).delete(id);r.onsuccess=()=>resolve();r.onerror=()=>reject(r.error);});}
 const GAS_WEB_APP_URL='https://script.google.com/macros/s/AKfycbwlu79q4DAV9xKUVSUmqeucTghJSyqOBb18CSZajSvrVROW0l2Y6mMIf8Zawtp1VhqZ/exec';
+
+// ตรวจสอบ Origin ของ Google Apps Script Bridge
+const TRUSTED_GAS_ORIGIN = /^https:\/\/(?:script\.google\.com|[a-z0-9.-]*script\.googleusercontent\.com)$/i;
+
 let apiFrame=null, apiReady=false, apiWaiters=[], apiCalls=new Map(), apiSeq=0;
 function initApiBridge(){if(apiFrame)return;apiFrame=document.createElement('iframe');apiFrame.title='Google Apps Script API';apiFrame.setAttribute('aria-hidden','true');apiFrame.style.cssText='position:absolute;width:1px;height:1px;left:-9999px;border:0';apiFrame.src=GAS_WEB_APP_URL+'?bridge=1';document.body.appendChild(apiFrame);apiFrame.addEventListener('load',()=>{ /* bridge announces readiness via postMessage */ });}
 // รับข้อความจาก Bridge ของ Apps Script โดยตรวจ origin ที่เชื่อถือได้
 window.addEventListener('message',event=>{
- if(!apiFrame||!TRUSTED_GAS_ORIGIN.test(event.origin))return;
+ if(!apiFrame ||
+    event.source !== apiFrame.contentWindow ||
+    !TRUSTED_GAS_ORIGIN.test(event.origin)) return;
  const d=event.data||{};
  if(d.type==='EXPENSE_BRIDGE_READY'){
   apiReady=true;
